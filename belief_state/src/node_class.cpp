@@ -18,11 +18,11 @@
 #include "kalman_filter.h"
 
 //const int BALL_AT_CORNER_THRESH	= 20; 
-const int HALF_FIELD_MAXX		= 3000; 
-const int HALF_FIELD_MAXY		= 2000;
+const int HALF_FIELD_MAXX		= 6000; 
+const int HALF_FIELD_MAXY		= 4500;
 const float MAX_DRIBBLE_R		= 3;
-const int DBOX_WIDTH			= 600;
-const int DBOX_HEIGHT			= 600;
+const int DBOX_WIDTH			= 2400;
+const int DBOX_HEIGHT			= 1200;
 const int MAX_QUEUE_SZ			= 5;
 short int isteamyellow = 0;
 
@@ -174,7 +174,6 @@ BeliefState::BeliefState(const krssg_ssl_msgs::SSL_DetectionFrame::ConstPtr& vms
 			this->ballDetected = 1;
 			/*this->ballPos.x = vmsg->balls[0].x;
 			this->ballPos.y = vmsg->balls[0].y;
-
 			//FILTERING BALLPOS
 			if(prev_msgQ.size() == MAX_QUEUE_SZ){
 				this->ballPos.x *= FILTER[MAX_QUEUE_SZ - 1];
@@ -247,7 +246,6 @@ BeliefState::BeliefState(const krssg_ssl_msgs::SSL_DetectionFrame::ConstPtr& vms
     		this->homeVel[bot_id].y = x(3);
     		/*this->homePos[bot_id].x = homePos[i].x;
     		this->homePos[bot_id].y = homePos[i].y;
-
 			//HOMEPOS FILTERING
 			if(prev_msgQ.size() == MAX_QUEUE_SZ){
 			this->homePos[i].x *= FILTER[MAX_QUEUE_SZ - 1];
@@ -319,7 +317,6 @@ BeliefState::BeliefState(const krssg_ssl_msgs::SSL_DetectionFrame::ConstPtr& vms
     		this->awayPos[bot_id].x = awayPos[i].x;
     		this->awayPos[bot_id].y = awayPos[i].y;
     		this->awayPos[bot_id].theta = awayPos[i].orientation;
-
     		//AWAYPOS FILTERING
     		if(prev_msgQ.size() == MAX_QUEUE_SZ){
 				this->awayPos[i].x *= FILTER[MAX_QUEUE_SZ - 1];
