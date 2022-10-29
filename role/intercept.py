@@ -13,7 +13,16 @@ from krssg_ssl_msgs.msg import point_2d
 from krssg_ssl_msgs.msg import BeliefState
 from krssg_ssl_msgs.msg import gr_Commands
 from krssg_ssl_msgs.msg import gr_Robot_Command
+from velocity.run_w import *
+from kubs import kubs, cmd_node
+from velocity.run_w import *
 import rospy,sys
+from krssg_ssl_msgs.msg import point_2d
+from utils.geometry import Vector2D
+from utils.config import *
+from krssg_ssl_msgs.srv import *
+from utils.functions import *
+import math
 
 
 rospy.wait_for_service('bsServer',)
@@ -115,13 +124,7 @@ class Intercept(behavior.Behavior):
 
     def calcTheta(self):          
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
-        ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)        self.add_transition(behavior.Behavior.State.start,Intercept.State.setup,lambda: True,'immediately')
-
-        self.add_transition(Intercept.State.setup,Intercept.State.in_2_alpha, lambda:self.bot_inside_2alpha() ,'In 2 alpha')
-
-        self.add_transition(Intercept.State.setup,Intercept.State.outside_circles, lambda:self.bot_outside_circles() ,'Outside circles')
-
-        self.add_transition(Intercept.State.setup,Intercept.State.inside_circles, lambda:not self.bot_inside_2alpha() and not self.bot_outside_circles() ,'Inside circles')
+        ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
         vec_ball_bot = kub_pos - self.target
         dot_temp = vec_ball_bot.dot(ball_vel)
         final = dot_temp / (ball_vel.abs(ball_vel) * vec_ball_bot.abs(vec_ball_bot))
@@ -205,14 +208,41 @@ class Intercept(behavior.Behavior):
 
     def execute_inside_2alpha(self):
         while True:
+            
+            # t = rospy.Time.now()
+            # t = t.secs + 1.0*t.nsecs/pow(10,9)
+            # start_time = None
+            # [vx, vy, vw, REPLANNED] = velocity.run.Get_Vel(start_time, t, kub.kubs_id, GOAL_POINT, kub.state.homePos, kub.state.awayPos, avoid_ball) 
+            
+
             k = 0.75
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
             direct_vel = (kub_pos - self.target) * MAX_BOT_SPEED / (kub_pos - self.target).abs()
             ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
             vel_max_given = direct_vel - ball_vel
             vel = min(vel_max_given, k*self.to_move_circle.center.dist(self.target))
-            
+            rotate = self.theta
             vel = vel*direct_vel + ball_vel
+            rotate = 
+            vw = Get_Omega(self.kub.kubs_id,rotate,self.kub.state.homePos)
+
+            if abs(normalize_angle(self.kub.state.homePos[self.kub.kubs_id].theta-rotate))<ROTATION_FACTOR:
+                self.kub.turn(0)
+                # print("Angle completed")
+                # FLAG_turn = True
+            else:
+                self.kub.turn(vw)
+            # print("Distance ______",dist(kub.state.homePos[kub.kubs_id], GOAL_POINT))
+            if dist(self.kub.state.homePos[self.kub.kubs_id], GOAL_POINT)<DIST_THRESH :
+                self.kub.move(0,0)
+                # print("Distance completed"*200)
+                # FLAG_move = True
+            else:
+                # print("Sending velocity",vx,vy)
+                self.kub.move(vx, vy)
+
+            self.kub.execute()
+            # yield self.kub,GOAL_POINT
             self.kub.move(vel.x,vel.y)
 
             self.kub.execute()
