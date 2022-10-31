@@ -64,7 +64,8 @@ class Intercept(behavior.Behavior):
 
         self.alpha = math.pi/8
 
-        self.d = BOT_BALL_THRESH*1.5
+        self.d = BOT_BALL_THRESH*2
+
 
         self.radius = self.d/2*sin(self.alpha)
 
@@ -108,7 +109,7 @@ class Intercept(behavior.Behavior):
 
         self.add_transition(Intercept.State.setup,Intercept.State.in_2_alpha, lambda:self.bot_inside_2alpha() ,'In 2 alpha')
 
-        self.add_transition(Intercept.State.setup,Intercept.State.outside_circles, lambda:self.bot_outside_circles() ,'Outside circles')
+        self.add_transition(Intercept.State.setup,Intercept.State.outside_circles, lambda:self.bot_outside_circles() and not self.bot_inside_2alpha(),'Outside circles')
 
         self.add_transition(Intercept.State.setup,Intercept.State.move_on_circle, lambda:self.bot_on_circle() ,'On circle')
 
@@ -156,13 +157,17 @@ class Intercept(behavior.Behavior):
     def calcTheta(self):          
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
         ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
+        # ball_vel=Vector2D(1,-1)
         vec_ball_bot = kub_pos - self.target
+        print("===========vec_trg_bot===============",vec_ball_bot.x,vec_ball_bot.y)
         dot_temp = vec_ball_bot.dot(ball_vel)
         final = dot_temp / (ball_vel.abs(ball_vel) * vec_ball_bot.abs(vec_ball_bot))
-        self.theta = acos(final)
+        self.theta = math.acos(final)
+        print("=============theta=========",self.theta)
 
     def calcCenter(self):
         ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
+        # ball_vel = Vector2D(1,-1)
         ball_vel_dir = -1*ball_vel*(1/ball_vel.abs(ball_vel))
         cos_beta = sin(self.alpha)
         sin_beta = cos(self.alpha)
@@ -187,6 +192,7 @@ class Intercept(behavior.Behavior):
     def add_target(self):
         ball_pos = Vector2D(self.kub.state.ballPos.x,self.kub.state.ballPos.y)
         ball_vel = Vector2D(self.kub.state.ballVel.x,self.kub.state.ballVel.y)
+        # ball_vel = Vector2D(1,-1)
 
         if ball_vel.abs(ball_vel) != 0:
             self.target = ball_pos + self.d*(ball_vel)*(1/ball_vel.abs(ball_vel))
@@ -196,9 +202,11 @@ class Intercept(behavior.Behavior):
     def decide_tangent(self):
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
         ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
+        # ball_vel = Vector2D(1,-1)
         bot_target_vec = self.target - kub_pos
         dist_bot_center = kub_pos.dist(self.to_move_circle.center)
         theta = math.acos(self.radius/dist_bot_center)
+
 
         vec_center_bot = kub_pos - self.to_move_circle.center
 
@@ -221,6 +229,7 @@ class Intercept(behavior.Behavior):
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
         bot_target_vec = self.target - kub_pos
         ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
+        
         theta1 = math.atan2(kub_pos.y-self.to_move_circle.center.y,kub_pos.x-self.to_move_circle.center.x)
         theta2 = math.atan2(self.target.y-self.to_move_circle.center.y,self.target.x-self.to_move_circle.center.x)
         theta = theta1 - theta2
@@ -262,9 +271,9 @@ class Intercept(behavior.Behavior):
             self.to_move_circle = self.circle1
         else:
             self.to_move_circle = self.circle2
-        self.point_on_circle = self.to_move_circle.center + self.radius*self.vec_to_point
+        self.decide_tangent()
 
-        self.add_point_on_arc()
+        # self.add_point_on_arc()
 
     def on_enter_setup(self):
         self.behavior_failed = False
@@ -277,50 +286,60 @@ class Intercept(behavior.Behavior):
     def on_exit_setup(self):
         pass
 
-    def on_enter_inside_2alpha(self):
+    def on_enter_in_2_alpha(self):
         pass
 
-    def execute_inside_2alpha(self):
+    def execute_in_2_alpha(self):
         while True:
             
-            k = 4
+            k = 2
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
-            direct_vel = (self.target-kub_pos) * MAX_BOT_SPEED / (self.target-kub_pos).abs(self.target-kub_pos)
+            direct_vel = (self.target-kub_pos) * MAX_BOT_SPEED * (1 / (self.target-kub_pos).abs(self.target-kub_pos))
+            bot_target_vec = self.target - kub_pos
+            bot_target_dir = bot_target_vec*(1/bot_target_vec.abs(bot_target_vec))
             ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
+            
             vel_max_given = direct_vel - ball_vel
-            vel = min(vel_max_given, k*self.to_move_circle.center.dist(self.target))
-            vel = vel*direct_vel + ball_vel
+            vel = min(vel_max_given, k*kub_pos.dist(self.target))
+            vel = vel*bot_target_dir + ball_vel
 
-            rotate = -1*ball_vel.angle()
-            vw = Get_Omega(self.kub.kubs_id,rotate,self.kub.state.homePos)
+            # rotate = -1*ball_vel.angle()
+            # vw = Get_Omega(self.kub.kubs_id,rotate,self.kub.state.homePos)
 
-            if abs(normalize_angle(self.kub.state.homePos[self.kub.kubs_id].theta-rotate))<ROTATION_FACTOR:
-                self.kub.turn(0)
-                # print("Angle completed")
-                # FLAG_turn = True
-            else:
-                self.kub.turn(vw)
+            # if abs(normalize_angle(self.kub.state.homePos[self.kub.kubs_id].theta-rotate))<ROTATION_FACTOR:
+            #     self.kub.turn(0)
+            #     # print("Angle completed")
+            #     # FLAG_turn = True
+            # else:
+            #     self.kub.turn(vw)
+            
+            
             # print("Distance ______",dist(kub.state.homePos[kub.kubs_id], GOAL_POINT))
             # yield self.kub,GOAL_POINT
             self.kub.move(vel.x,vel.y)
 
             self.kub.execute()
             
-            if  self.target.dist(kub_pos) < 10:
+            if  self.target.dist(kub_pos) < 5:
                 break
 
             try:
                 self.kub.state = getState(prev_state).stateB
             except rospy.ServiceException, e:
                 print("Error ", e)
-            self.update_all()    
+            # self.update_all()   
+            self.add_target()
+            self.calcCenter() 
 
-    def on_exit_inside_2alpha(self):
+
+
+    def on_exit_in_2_alpha(self):
         pass
 
 
     def on_enter_outside_circles(self):
         ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
+        # ball_vel = Vector2D(1,-1)
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
         
         if kub_pos.dist(self.center1) < kub_pos.dist(self.center2):
@@ -341,37 +360,39 @@ class Intercept(behavior.Behavior):
 
 
 
+
     def execute_outside_circles(self):
         
         while True:
-            k = 4
+            k = 0.3
+            k1 = 1.5
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
             direct_vel = self.tangent*MAX_BOT_SPEED
             ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
+            # ball_vel = Vector2D(1,-1)
             vel_max_given = direct_vel - ball_vel
-            vel = min(vel_max_given, k*self.to_move_circle.center.dist(self.point_on_circle))
+            vel = min(vel_max_given.abs(vel_max_given), k*kub_pos.dist(self.point_on_circle))
 
             rotate = -1*ball_vel.angle()
             vw = Get_Omega(self.kub.kubs_id,rotate,self.kub.state.homePos)
 
-            if abs(normalize_angle(self.kub.state.homePos[self.kub.kubs_id].theta-rotate))<ROTATION_FACTOR:
-                self.kub.turn(0)
-            else:
-                self.kub.turn(vw)
+            # if abs(normalize_angle(self.kub.state.homePos[self.kub.kubs_id].theta-rotate))<ROTATION_FACTOR:
+            #     self.kub.turn(0)
+            # else:
+            #     self.kub.turn(vw)
             
-            vel = vel*self.tangent + ball_vel
+            vel = vel*self.tangent + ball_vel*k1
             self.kub.move(vel.x,vel.y)
 
             self.kub.execute()
             
-            if  self.point_on_circle.dist(kub_pos) < 10:
+            if  self.point_on_circle.dist(kub_pos) < 100:
                 break
 
             try:
-                state = getState(state)
+                self.kub.state = getState(prev_state).stateB
             except rospy.ServiceException, e:
-                print("Error ",e)
-            self.kub.update_state(state)
+                print("Error ", e)
             self.update_all()
 
             
@@ -447,5 +468,4 @@ class Intercept(behavior.Behavior):
         pass
 
         
-
 
