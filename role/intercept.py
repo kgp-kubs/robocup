@@ -308,7 +308,7 @@ class Intercept(behavior.Behavior):
                 self.behavior_completed = True
                 break
 
-            if self.bot_outside_circles and not self.bot_inside_2alpha():
+            if self.bot_outside_circles() and not self.bot_inside_2alpha():
                 self.behavior_failed = True
                 break
 
@@ -339,7 +339,7 @@ class Intercept(behavior.Behavior):
     def execute_outside_circles(self):
         
         while True:
-            k = 7
+            k = 13
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
             direct_vel = self.tangent*MAX_BOT_SPEED
             ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
@@ -360,6 +360,8 @@ class Intercept(behavior.Behavior):
             self.kub.execute()
             
             if  self.point_on_circle.dist(kub_pos) < 25:
+                self.kub.move(0,0)
+                self.kub.execute()
                 break
 
             if self.bot_inside_2alpha() or not self.bot_outside_circles():
@@ -408,7 +410,11 @@ class Intercept(behavior.Behavior):
 
             # if not vicinity_points(self.kub.state.ballPos,target):
             #     self.behavior_failed = True
+        
             #     break
+
+        self.kub.move(0,0)
+        self.kub.execute()
 
     def on_exit_move_on_circle(self):
         pass
