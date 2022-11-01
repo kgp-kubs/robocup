@@ -4,7 +4,9 @@ from locale import ERA
 from velocity.run_w import *
 import behavior
 import _GoToPoint_
+import _GoOnArc_
 import _GoOnArc_intercept
+import time
 
 import rospy
 from utils.functions import *
@@ -81,6 +83,8 @@ class Intercept(behavior.Behavior):
 
         self.behavior_failed = False
 
+        self.behavior_completed = False
+
         self.add_state(Intercept.State.setup,behavior.Behavior.State.running)
 
         self.add_state(Intercept.State.in_2_alpha,behavior.Behavior.State.running)
@@ -113,6 +117,8 @@ class Intercept(behavior.Behavior):
 
         self.add_transition(Intercept.State.move_on_circle,Intercept.State.setup,lambda:self.behavior_failed, 'Move on Circle failed')
 
+        self.add_transition(Intercept.State.move_on_circle,behavior.Behavior.State.completed,lambda:self.at_target_point() or self.behavior_completed, 'Completed')
+
 
 
 
@@ -140,6 +146,11 @@ class Intercept(behavior.Behavior):
 
         return False
 
+    def at_target_point(self):
+        kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
+        if kub_pos.dist(self.target) <= 25:
+            return True
+        return False
 
     def add_ball_dir(self):
         ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
@@ -150,8 +161,11 @@ class Intercept(behavior.Behavior):
         # ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
         vec_ball_bot = kub_pos - self.target
         dot_temp = vec_ball_bot.dot(self.ball_vel_dir)
+        print("=============ball_vel_dir====================",self.ball_vel_dir.x,self.ball_vel_dir.y)
+        print("=============vec_ball_bot====================",vec_ball_bot.x,vec_ball_bot.y)
         final = dot_temp / vec_ball_bot.abs(vec_ball_bot)
         self.theta = math.acos(final)
+        print("=============theta====================",self.theta)
 
     def calcCenter(self):
         ball_vel_dir = -1*self.ball_vel_dir
@@ -227,23 +241,28 @@ class Intercept(behavior.Behavior):
         self.radius_arc = dist(self.center_arc, self.target)
 
     def update_all(self):
-        try:
-            self.kub.state = getState(prev_state).stateB
-        except rospy.ServiceException, e:
-            print("Error ", e)
 
+        kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
         self.add_target()
         self.calcCenter()
-        if self.decided_circle == 'circle1':
-            self.to_move_circle = self.circle1
-        else:
-            self.to_move_circle = self.circle2
-        self.decide_tangent()
+        if self.theta > self.alpha:
+            if self.decided_circle == 'circle1':
+                self.to_move_circle = self.circle1
+            else:
+                self.to_move_circle = self.circle2
+        
+            if self.to_move_circle.center.dist(kub_pos)>self.radius+10:
+                self.decide_tangent()
 
     def on_enter_setup(self):
         self.behavior_failed = False
 
     def execute_setup(self):
+        time.sleep(0.2)
+        try:
+            self.kub.state = getState(prev_state).stateB
+        except rospy.ServiceException, e:
+            print("Error ", e)
         self.add_ball_dir()
         self.add_target()
         self.calcTheta()
@@ -258,7 +277,7 @@ class Intercept(behavior.Behavior):
     def execute_in_2_alpha(self):
         while True:
             
-            k = 2
+            k = 4
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
             direct_vel = (self.target-kub_pos) * MAX_BOT_SPEED *(1/ (self.target-kub_pos).abs(self.target-kub_pos))
             bot_target_vec = (self.target - kub_pos)*(1/(self.target - kub_pos).abs(self.target - kub_pos))
@@ -281,8 +300,16 @@ class Intercept(behavior.Behavior):
             self.kub.move(vel.x,vel.y)
 
             self.kub.execute()
+            print("Distance ______",kub_pos.dist(self.target))
             
             if  self.target.dist(kub_pos) < 25:
+                self.kub.move(0,0)
+                self.kub.execute()
+                self.behavior_completed = True
+                break
+
+            if self.bot_outside_circles and not self.bot_inside_2alpha():
+                self.behavior_failed = True
                 break
 
             try:
@@ -312,12 +339,11 @@ class Intercept(behavior.Behavior):
     def execute_outside_circles(self):
         
         while True:
-            k = 3
-            k1 = 1.5
+            k = 7
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
             direct_vel = self.tangent*MAX_BOT_SPEED
             ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
-            vel_max_given = direct_vel - ball_vel*k1
+            vel_max_given = direct_vel - ball_vel
             vel = min(vel_max_given.abs(vel_max_given), k*self.to_move_circle.center.dist(self.point_on_circle))
 
             rotate = -1*ball_vel.angle()
@@ -328,12 +354,17 @@ class Intercept(behavior.Behavior):
             # else:
             #     self.kub.turn(vw)
             
-            vel = vel*self.tangent + ball_vel*k1
+            vel = vel*self.tangent + ball_vel
             self.kub.move(vel.x,vel.y)
 
             self.kub.execute()
             
             if  self.point_on_circle.dist(kub_pos) < 25:
+                break
+
+            if self.bot_inside_2alpha() or not self.bot_outside_circles():
+
+                self.behavior_failed = True
                 break
 
             try:
@@ -351,7 +382,7 @@ class Intercept(behavior.Behavior):
 
     def on_enter_move_on_circle(self):
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
-        if abs(kub_pos.dist(self.center1) - self.radius) < 25 :
+        if abs(kub_pos.dist(self.center1) - self.radius) < 20 :
             self.to_move_circle = self.circle1
             self.decided_circle = 'circle1'
 
@@ -360,24 +391,24 @@ class Intercept(behavior.Behavior):
             self.decided_circle = 'circle2'                        
 
         self.add_point_on_arc()
-        _GoOnArc_intercept.init(self.kub,self.kub.state.ballPos,self.center_arc,self.radius_arc,False,self.target,False)        
+        _GoOnArc_.init(self.kub,self.kub.state.ballPos,self.center_arc,self.radius_arc,False,self.target,False)        
 
     def execute_move_on_circle(self):
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)
-        generatingfunction = _GoOnArc_intercept.execute(start_time,self.DISTANCE_THRESH, self.ROTATION_FACTOR)
+        generatingfunction = _GoOnArc_.execute(start_time,self.DISTANCE_THRESH, self.ROTATION_FACTOR)
         print("Datatype of gf:",type(generatingfunction))
         for gf in generatingfunction:
             self.kub,target = gf		# if FIRST_CALL == True:
 		# 	function2(1,state.stateB)
 		# 	FIRST_CALL = False
             self.update_all()
-            _GoOnArc_intercept.TARGET = self.kub.state.ballPos
-            _GoOnArc_intercept.POINT = self.target
+            _GoOnArc_.TARGET = self.kub.state.ballPos
+            _GoOnArc_.POINT = self.target
 
-            if not vicinity_points(self.target,target):
-                self.behavior_failed = True
-                break
+            # if not vicinity_points(self.kub.state.ballPos,target):
+            #     self.behavior_failed = True
+            #     break
 
     def on_exit_move_on_circle(self):
         pass
@@ -393,20 +424,20 @@ class Intercept(behavior.Behavior):
             self.decided_circle = 'circle2'
 
             self.add_point_on_arc()
-            _GoOnArc_intercept.init(self.kub,self.kub.state.ballPos,self.center_arc,self.radius_arc,False,self.target,False)
+            _GoOnArc_.init(self.kub,self.kub.state.ballPos,self.center_arc,self.radius_arc,False,self.target,False)
 
     def execute_inside_circles(self):
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)
-        generatingfunction = _GoOnArc_intercept.execute(start_time,self.DISTANCE_THRESH, self.ROTATION_FACTOR)
+        generatingfunction = _GoOnArc_.execute(start_time,self.DISTANCE_THRESH, self.ROTATION_FACTOR)
         print("Datatype of gf:",type(generatingfunction))
         for gf in generatingfunction:
             self.kub,target = gf
             self.update_all()
-            _GoOnArc_intercept.TARGET = self.kub.state.ballPos
-            _GoOnArc_intercept.POINT = self.target
+            _GoOnArc_.TARGET = self.kub.state.ballPos
+            _GoOnArc_.POINT = self.target
 
-            if not vicinity_points(self.target,target):
+            if not vicinity_points(self.kub.state.ballPos,target):
                 self.behavior_failed = True
                 break
 
@@ -414,5 +445,4 @@ class Intercept(behavior.Behavior):
         pass
 
         
-
 
