@@ -7,7 +7,7 @@ from krssg_ssl_msgs.msg import BeliefState
 from krssg_ssl_msgs.msg import gr_Commands
 from krssg_ssl_msgs.msg import gr_Robot_Command
 from krssg_ssl_msgs.msg import BeliefState
-from role import  GoToBall, GoToPoint,DribbleAndKick3, intercept
+from role import  GoToBall, GoToPoint,DribbleAndKick, intercept, intercept_back
 from multiprocessing import Process
 from kubs import kubs
 from krssg_ssl_msgs.srv import bsServer
@@ -24,10 +24,19 @@ def function2(id_,state):
 	kub = kubs.kubs(id_,state,pub)
 	kub.update_state(state)
 	print(kub.kubs_id)
-	g_fsm = DribbleAndKick3.DribbleAndKick()
+	g_fsm = DribbleAndKick.DribbleAndKick()
 	# g_fsm = GoToPoint.GoToPoint()
 	g_fsm.add_kub(kub)
 	# g_fsm.add_point(point=kub.state.ballPos,orient=normalize_angle(pi+atan2(state.ballPos.y,state.ballPos.x-3000)))
+	if state.ballPos.x == 0:
+		if state.ballPos.y > 0:
+			g_fsm.add_theta(theta=pi/2)
+		elif state.ballPos.y < 0:
+			g_fsm.add_theta(theta=-pi/2)
+		else:
+			g_fsm.add_theta(theta=0)
+	else:
+		g_fsm.add_theta(theta=normalize_angle(atan2(state.ballPos.y,state.ballPos.x)))
 	g_fsm.as_graphviz()
 	g_fsm.write_diagram_png()
 	print('something before spin')
@@ -38,7 +47,7 @@ def function1(id_,state):
 	kub = kubs.kubs(id_,state,pub)
 	kub.update_state(state)
 	print(kub.kubs_id)
-	g_fsm = intercept.Intercept()
+	g_fsm = intercept_back.Intercept()
 	g_fsm.add_kub(kub)
 	# g_fsm.add_point(point=kub.state.ballPos,orient=normalize_angle(pi+atan2(state.ballPos.y,state.ballPos.x-3000)))
 	# g_fsm.add_theta(theta=normalize_angle(math.pi/2+atan2(state.ballPos.y,state.ballPos.x+3000)))
@@ -71,16 +80,15 @@ while True:
 	if state:
 		print('lasknfcjscnajnstate',state.stateB.homePos)
 
-		if FIRST_CALL == True:
+		if count<2:
 			function2(1,state.stateB)
-			FIRST_CALL = False
-		else:
+		elif count<7:
 			function1(4,state.stateB)
 			print('chal ja')
-		# break
+		else:
+			break
 	count = count + 1
-if count<500:
+if count<7:
 	rospy.spin()
-
 
 
