@@ -233,7 +233,7 @@ class Intercept(behavior.Behavior):
             return
         bot_pos = self.kub.get_pos()
         a1,b1,c1 = 2*(self.target.x-bot_pos.x), 2*(self.target.y-bot_pos.y), bot_pos.x**2+bot_pos.y**2-self.target.x**2-self.target.y**2
-        a2,b2,c2 = 2*(self.kub.state.ballPos.x-bot_pos.x), 2*(self.kub.state.ballPos.y-bot_pos.y), bot_pos.x**2+bot_pos.y**2-self.target.x**2-self.target.y**2
+        a2,b2,c2 = 2*(self.kub.state.ballPos.x-bot_pos.x), 2*(self.kub.state.ballPos.y-bot_pos.y), bot_pos.x**2+bot_pos.y**2-self.kub.state.ballPos.x**2-self.kub.state.ballPos.y**2
         x = (b1*c2-b2*c1)/(a1*b2-a2*b1)
         y = (c1*a2-c2*a1)/(a1*b2-a2*b1)
         self.center_arc = Vector2D()
