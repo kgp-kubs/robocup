@@ -98,9 +98,15 @@ class StateMachine(object):
         # if s1 is not None:
         #     print(self._transitions[s1])
 
+        if str(self.state) == 'State.completed':
+            return True
+
         if s1 != self.state:
             # print self.state is not self._end_state
-            StateMachine.spin(self)
+            flag = StateMachine.spin(self)
+            return flag
+
+        return False
 
     # if you add a transition that already exists, the old one will be
     # overwritten
