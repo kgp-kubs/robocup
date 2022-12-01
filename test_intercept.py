@@ -21,6 +21,7 @@ pub = rospy.Publisher('/grsim_data',gr_Commands,queue_size=1000)
 count = 0
 
 def function2(id_,state):
+	flag = False
 	kub = kubs.kubs(id_,state,pub)
 	kub.update_state(state)
 	print(kub.kubs_id)
@@ -40,10 +41,12 @@ def function2(id_,state):
 	g_fsm.as_graphviz()
 	g_fsm.write_diagram_png()
 	print('something before spin')
-	g_fsm.spin()
+	flag = g_fsm.spin()
+	return flag
 
 
 def function1(id_,state):
+	flag = False
 	kub = kubs.kubs(id_,state,pub)
 	kub.update_state(state)
 	print(kub.kubs_id)
@@ -54,7 +57,8 @@ def function1(id_,state):
 	g_fsm.as_graphviz()
 	g_fsm.write_diagram_png()
 	print('something before spin')
-	g_fsm.spin()
+	flag = g_fsm.spin()
+	return flag
 	# 
 
 
@@ -65,14 +69,12 @@ start_time = rospy.Time.now()
 start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
 FIRST_CALL = True
 # rospy.Subscriber('/belief_state', BeliefState, BS_callback, queue_size=1000)
-
+dribble = True
+count = 0
 while True:
 	state = None
 	rospy.wait_for_service('bsServer',)
-	getState = rospy.ServiceProxy('bsServer',bsServer)
-	if count>500 :
-		break
-	
+	getState = rospy.ServiceProxy('bsServer',bsServer)	
 	try:
 		state = getState(state)
 	except rospy.ServiceException, e:
@@ -80,15 +82,17 @@ while True:
 	if state:
 		print('lasknfcjscnajnstate',state.stateB.homePos)
 
-		if count<2:
-			function2(1,state.stateB)
-		elif count<7:
-			function1(4,state.stateB)
-			print('chal ja')
-		else:
-			break
-	count = count + 1
-if count<7:
-	rospy.spin()
+	if dribble:
+		flag = function2(1,state.stateB)
+		print str(flag)
+		if flag:
+			dribble = False
 
+	else:
+		flag = function1(4,state.stateB)
+		if flag:
+			break
+	print('chal ja')
+if not flag:
+	rospy.spin()
 
