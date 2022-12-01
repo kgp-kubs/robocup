@@ -5,7 +5,6 @@ from velocity.run_w import *
 import behavior
 import _GoToPoint_
 import _GoOnArc_
-import _GoOnArc_intercept
 import time
 
 import rospy
@@ -73,7 +72,7 @@ class Intercept(behavior.Behavior):
 
         self.ball_thresh = BOT_BALL_THRESH*4
 
-        self.DISTANCE_THRESH = BOT_BALL_THRESH
+        self.DISTANCE_THRESH = BOT_BALL_THRESH*2
 
         self.ROTATION_FACTOR = ROTATION_FACTOR
 
@@ -163,11 +162,11 @@ class Intercept(behavior.Behavior):
         # ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
         vec_ball_bot = kub_pos - self.target
         dot_temp = vec_ball_bot.dot(self.ball_vel_dir)
-        print("=============ball_vel_dir====================",self.ball_vel_dir.x,self.ball_vel_dir.y)
-        print("=============vec_ball_bot====================",vec_ball_bot.x,vec_ball_bot.y)
+        #print("=============ball_vel_dir====================",self.ball_vel_dir.x,self.ball_vel_dir.y)
+        #print("=============vec_ball_bot====================",vec_ball_bot.x,vec_ball_bot.y)
         final = dot_temp / vec_ball_bot.abs(vec_ball_bot)
         self.theta = math.acos(final)
-        print("=============theta====================",self.theta)
+        #print("=============theta====================",self.theta)
 
     def calcCenter(self):
         ball_vel_dir = -1*self.ball_vel_dir
@@ -234,7 +233,7 @@ class Intercept(behavior.Behavior):
             return
         bot_pos = self.kub.get_pos()
         a1,b1,c1 = 2*(self.target.x-bot_pos.x), 2*(self.target.y-bot_pos.y), bot_pos.x**2+bot_pos.y**2-self.target.x**2-self.target.y**2
-        a2,b2,c2 = 2*(self.kub.state.ballPos.x-bot_pos.x), 2*(self.kub.state.ballPos.y-bot_pos.y), bot_pos.x**2+bot_pos.y**2-self.target.x**2-self.target.y**2
+        a2,b2,c2 = 2*(self.kub.state.ballPos.x-bot_pos.x), 2*(self.kub.state.ballPos.y-bot_pos.y), bot_pos.x**2+bot_pos.y**2-self.kub.state.ballPos.x**2-self.kub.state.ballPos.y**2
         x = (b1*c2-b2*c1)/(a1*b2-a2*b1)
         y = (c1*a2-c2*a1)/(a1*b2-a2*b1)
         self.center_arc = Vector2D()
@@ -243,6 +242,10 @@ class Intercept(behavior.Behavior):
         self.radius_arc = dist(self.center_arc, self.target)
 
     def update_all(self):
+        try:
+            self.kub.state = getState(prev_state).stateB
+        except rospy.ServiceException, e:
+            print("Error ", e)
 
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
         self.add_target()
@@ -293,20 +296,16 @@ class Intercept(behavior.Behavior):
             self.kub.execute()
             print("Distance ______",kub_pos.dist(self.target))
             
-            if  self.target.dist(kub_pos) < 25:
+            if  self.target.dist(kub_pos) < 20:
                 self.kub.move(0,0)
                 self.kub.execute()
                 self.behavior_completed = True
                 break
 
-            if self.bot_outside_circles() and not self.bot_inside_2alpha():
+            if not self.bot_inside_2alpha():
                 self.behavior_failed = True
                 break
 
-            try:
-                self.kub.state = getState(prev_state).stateB
-            except rospy.ServiceException, e:
-                print("Error ", e)
             self.update_all()    
 
     def on_exit_in_2_alpha(self):
@@ -331,12 +330,12 @@ class Intercept(behavior.Behavior):
     def execute_outside_circles(self):
         
         while True:
-            k = 13
+            k = 2
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
             direct_vel = self.tangent*MAX_BOT_SPEED
             ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
             vel_max_given = direct_vel - ball_vel
-            vel = min(vel_max_given.abs(vel_max_given), k*self.to_move_circle.center.dist(self.point_on_circle))
+            vel = min(vel_max_given.abs(vel_max_given), k*kub_pos.dist(self.point_on_circle))
 
             rotate = -1*ball_vel.angle()
             # vw = Get_Omega(self.kub.kubs_id,rotate,self.kub.state.homePos)
@@ -351,7 +350,7 @@ class Intercept(behavior.Behavior):
 
             self.kub.execute()
             
-            if  self.point_on_circle.dist(kub_pos) < 25:
+            if  self.point_on_circle.dist(kub_pos) < 20:
                 self.kub.move(0,0)
                 self.kub.execute()
                 break
@@ -361,10 +360,6 @@ class Intercept(behavior.Behavior):
                 self.behavior_failed = True
                 break
 
-            try:
-                self.kub.state = getState(prev_state).stateB
-            except rospy.ServiceException, e:
-                print("Error ", e)
             self.update_all()
 
             
@@ -376,7 +371,7 @@ class Intercept(behavior.Behavior):
 
     def on_enter_move_on_circle(self):
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
-        if abs(kub_pos.dist(self.center1) - self.radius) < 20 :
+        if abs(kub_pos.dist(self.center1) - self.radius) < 25 :
             self.to_move_circle = self.circle1
             self.decided_circle = 'circle1'
 
@@ -384,11 +379,12 @@ class Intercept(behavior.Behavior):
             self.to_move_circle = self.circle2
             self.decided_circle = 'circle2'                        
 
+        self.update_all()
         self.add_point_on_arc()
-        _GoOnArc_.init(self.kub,self.kub.state.ballPos,self.center_arc,self.radius_arc,False,self.target,False)
-        self.update_all()        
+        _GoOnArc_.init(self.kub,self.kub.state.ballPos,self.center_arc,self.radius_arc,False,self.target,False)        
 
     def execute_move_on_circle(self):
+        self.update_all()
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)
         generatingfunction = _GoOnArc_.execute(start_time,self.DISTANCE_THRESH, self.ROTATION_FACTOR)
@@ -403,12 +399,12 @@ class Intercept(behavior.Behavior):
 
             if not vicinity_points(self.kub.state.ballPos,target):
                 self.behavior_failed = True
-        
                 break
 
 
     def on_exit_move_on_circle(self):
-        pass
+        self.kub.move(0,0)
+        self.kub.execute()
 
     def on_enter_inside_circles(self):
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
@@ -428,7 +424,6 @@ class Intercept(behavior.Behavior):
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)
         generatingfunction = _GoOnArc_.execute(start_time,self.DISTANCE_THRESH, self.ROTATION_FACTOR)
-        print("Datatype of gf:",type(generatingfunction))
         for gf in generatingfunction:
             self.kub,target = gf
             self.update_all()
@@ -443,4 +438,3 @@ class Intercept(behavior.Behavior):
         pass
 
         
-

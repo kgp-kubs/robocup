@@ -5,7 +5,6 @@ from velocity.run_w import *
 import behavior
 import _GoToPoint_
 import _GoOnArc_
-import _GoOnArc_intercept
 import time
 
 import rospy
@@ -331,12 +330,12 @@ class Intercept(behavior.Behavior):
     def execute_outside_circles(self):
         
         while True:
-            k = 13
+            k = 4
             kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
             direct_vel = self.tangent*MAX_BOT_SPEED
             ball_vel = Vector2D(self.kub.state.ballVel.x, self.kub.state.ballVel.y)
             vel_max_given = direct_vel - ball_vel
-            vel = min(vel_max_given.abs(vel_max_given), k*self.to_move_circle.center.dist(self.point_on_circle))
+            vel = min(vel_max_given.abs(vel_max_given), k*kub_pos.dist(self.point_on_circle))
 
             rotate = -1*ball_vel.angle()
             # vw = Get_Omega(self.kub.kubs_id,rotate,self.kub.state.homePos)
@@ -408,7 +407,8 @@ class Intercept(behavior.Behavior):
 
 
     def on_exit_move_on_circle(self):
-        pass
+        self.kub.move(0,0)
+        self.kub.execute()
 
     def on_enter_inside_circles(self):
         kub_pos = Vector2D(self.kub.state.homePos[self.kub.kubs_id].x, self.kub.state.homePos[self.kub.kubs_id].y)
@@ -443,4 +443,3 @@ class Intercept(behavior.Behavior):
         pass
 
         
-
